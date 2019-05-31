@@ -1,5 +1,3 @@
-﻿
-# token = "3b05a268f2d4b9b161b6dcc5842dfab562a14c6ba8720c5ec9be4d87164913ae0ec95ee23c257d84c6c4e"
 import vk_api
 import time
 import json
