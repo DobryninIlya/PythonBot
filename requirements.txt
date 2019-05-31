@@ -2,5 +2,3 @@ vk_api
 xlrd
 xlwt
 datetime
-time
-random
