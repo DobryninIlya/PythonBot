@@ -11,7 +11,7 @@ today = datetime.date.today()
 print(datetime.date(today.year, today.month, today.day).isocalendar()[1])
 
 
-token = vk_api.VkApi(os.environ.get("BOT_TOKEN"))
+token = vk_api.VkApi("BOT_TOKEN")
 vk._auth_token()
 
 
