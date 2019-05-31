@@ -16,7 +16,7 @@ vk._auth_token()
 
 
 
-rb = xlrd.open_workbook('Расписание1.xlsx')
+rb = xlrd.open_workbook('\Расписание1.xlsx')
 sheet = rb.sheet_by_index(0)
 val = str(sheet.row_values(0)[1])
 
