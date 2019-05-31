@@ -10,10 +10,8 @@ import os
 today = datetime.date.today()
 print(datetime.date(today.year, today.month, today.day).isocalendar()[1])
 
-
 vk = vk_api.VkApi(token="3b05a268f2d4b9b161b6dcc5842dfab562a14c6ba8720c5ec9be4d87164913ae0ec95ee23c257d84c6c4e")
 vk._auth_token()
-
 
 
 rb = xlrd.open_workbook('\Расписание1.xlsx')
