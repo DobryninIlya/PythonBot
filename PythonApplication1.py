@@ -16,7 +16,7 @@ print(datetime.date(today.year, today.month, today.day).isocalendar()[1])
 token = os.environ.get("BOT_TOKEN")
 vk._auth_token()
 
-
+bot.run(str(token))
 
 rb = xlrd.open_workbook('D:/Расписание1.xlsx')
 sheet = rb.sheet_by_index(0)
