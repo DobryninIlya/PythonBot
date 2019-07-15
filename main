@@ -1,0 +1,298 @@
+
+import requests
+import vk_api
+import time
+import json
+import random
+import xlrd
+import xlwt
+import datetime
+#import pymysql
+import mysql
+
+
+token = "3b05a268f2d4b9b161b6dcc5842dfab562a14c6ba8720c5ec9be4d87164913ae0ec95ee23c257d84c6c4e"
+
+today = datetime.date.today()
+print("Готово")
+print("Текущая неделя: " + str(datetime.date(today.year, today.month, today.day).isocalendar()[1]))
+print("Текущий день недели по счету: " + str(datetime.date(today.year, today.month, today.day).isoweekday()))
+
+
+vk = vk_api.VkApi(token="3b05a268f2d4b9b161b6dcc5842dfab562a14c6ba8720c5ec9be4d87164913ae0ec95ee23c257d84c6c4e")
+vk._auth_token()
+
+
+
+#######################################Keyboards#####################################################
+def get_button(label, color, payload=""):
+    return {
+        "action": {
+            "type": "text",
+            "payload": json.dumps(payload),
+            "label": label
+        },
+        "color": color
+    }
+
+
+keyboard = {
+    "one_time": False,
+    "buttons": [
+
+
+        [get_button(label="РАСПИСАНИЕ: На завтра", color="positive")],
+        [
+        get_button(label="На сегодня", color="primary"),
+        get_button(label="Полностью", color="primary")
+        ],
+        [{ "action": { "type": "location", "payload": "{\"button\": \"1\"}" }}]
+
+
+    ]
+}
+keyboard = json.dumps(keyboard, ensure_ascii=False).encode('utf-8')
+keyboard = str(keyboard.decode('utf-8'))
+#######################################Keyboards#####################################################
+#
+
+connection = pymysql.connect(user="IlyaDobrynin@botdbkai", password="AzurePassword5", host="botdatabase.database.windows.net",db="kaibotdb", port=3306, cursorclass=pymysql.cursors.DictCursor)
+#connection = mysql.connector.connect(user="lryreaigohmmau", password="6471f5042615575e3ae68347c431e8e0cf011faa8d87f1628bfa8e6060bd2b6d", host="kaibot.mysql.database.azure.com", port=3306, database="botkai")
+#connection = pymysql.connect(user="IlyaDobrynin@kaibot", password="AzurePassword5", host="kaibot.mysql.database.azure.com", port=3306)
+#connection = pymysql.connect(user="IlyaDobrynin@kaibot", password="AzurePassword5", host="botkai.database.windows.net", port=3306, db="botkai", charset='utf8mb4', cursorclass=pymysql.cursors.DictCursor)
+cursor = connection.cursor()
+
+
+
+def is_number(s):
+    try:
+        float(s)
+        return str(round(float(s)))
+    except ValueError:
+        return str(s)
+BASE_URL = 'https://kai.ru/raspisanie'
+
+def showGroupId(groupNumber):
+    response = requests.post( BASE_URL + "?p_p_id=pubStudentSchedule_WAR_publicStudentSchedule10&p_p_lifecycle=2&p_p_resource_id=getGroupsURL&query=" + groupNumber, headers = {'Content-Type': "application/x-www-form-urlencoded"}, params = {"p_p_id":"pubStudentSchedule_WAR_publicStudentSchedule10","p_p_lifecycle":"2","p_p_resource_id":"schedule"} )
+
+    response = response.json()[0]
+
+    return response['id']
+numbers=[9312, 9313, 9314, 9315, 9316 ,9317]
+def showTimetable(groupId, tomorrow=0):
+    today = datetime.date.today()
+    response = requests.post( BASE_URL, data = "groupId=" + str(groupId), headers = {'Content-Type': "application/x-www-form-urlencoded"}, params = {"p_p_id":"pubStudentSchedule_WAR_publicStudentSchedule10","p_p_lifecycle":"2","p_p_resource_id":"schedule"} )
+
+    response = response.json()[str(datetime.date(today.year, today.month, today.day + tomorrow).isoweekday())]
+    result = ''
+    for elem in response:
+        print(elem["dayDate"], datetime.date(today.year, today.month, today.day).isocalendar()[1])
+        if elem["dayDate"][:3]=="чет" and (datetime.date(today.year, today.month, today.day).isocalendar()[1] % 2 == 0):
+            result += str(chr(10148)) + elem["dayDate"][:3] + " " + " &#8987;" + elem["dayTime"][:5] +  " " + elem["disciplType"][:4] + " " + elem["disciplName"] + " " + elem["audNum"][:5] + elem["buildNum"][:2] +'зд.\n'
+        elif elem["dayDate"][:3]=="неч" and  not (datetime.date(today.year, today.month, today.day).isocalendar()[1] % 2 == 0):
+            result += str(chr(10148)) + elem["dayDate"][:3] + " " + " &#8987;" + elem["dayTime"][:5] + " " + elem["disciplType"][:4] + " " + elem["disciplName"] + " " + elem["audNum"][:5] + elem["buildNum"][:2] +'зд.\n'
+        elif not (elem["dayDate"][:3]=="чет") and not (elem["dayDate"][:3]=="неч"):
+            result += str(chr(10148)) + elem["dayDate"] + " " + " &#8987;" + elem["dayTime"][:5] + " " + elem["disciplType"][:4] + " " + elem["disciplName"] + " " + elem["audNum"][:5] + elem["buildNum"][:2] +'зд.\n'
+
+    return result
+
+
+
+def InBase(id): ### Проверка на зарегестрированность и наличие в базе Users
+    sql = "SELECT Name FROM Users WHERE ID_VK=" + str(id)
+    cursor.execute(sql)
+    res=''
+    for row in cursor:
+        res+=row["Name"]
+    if res == '':
+        return False
+
+    else:
+        return True
+
+
+def Registration(id, body):
+    if int(body[5:9])>1000:
+        try:
+            print(showGroupId(body[5:9]))
+            print("Регистрация пользователя "+ body[10:] + "," + str(showGroupId(body[5:9])))
+            sql = "INSERT INTO Users VALUES (" + str(id) + ', "' + str(body[10:]) + '", ' + str(showGroupId(body[5:9])) + ", 1, 1);"
+            cursor.execute(sql)
+            connection.commit()
+            vk.method("messages.send",
+                    {"peer_id": id, "message": "Регистрация завершена. Введено - \nГруппа: " + body[5:9] + ' \nИмя Фамилия: ' + body[10:],
+                        "random_id": random.randint(1, 2147483647)})
+        except Exception as E:
+            vk.method("messages.send",
+                        {"user_ids": str(users), "message": "Произошла непредвиденная ошибка." , "keyboard": keyboard, "random_id": random.randint(1, 2147483647), "attachment" : attachment})
+            print("Ошибка при регистрации. Вероятно, пользователь уже зарегестрирован")
+
+    else:
+        vk.method("messages.send",
+                        {"user_ids": str(users), "message": "Номер группы некорректный :[" , "keyboard": keyboard, "random_id": random.randint(1, 2147483647), "attachment" : attachment})
+
+
+
+
+
+while True:
+    try:
+
+        #  главный цикл
+        messages = vk.method("messages.getConversations", {"offset": 0, "count": 20})
+        if messages["count"] >= 1:
+            body = messages["items"][0]["last_message"]["text"]
+            id = messages["items"][0]["last_message"]["from_id"]
+            if InBase(id):
+                sql="SELECT AdmLevel FROM Users WHERE ID_VK="+str(id)
+                cursor.execute(sql)
+                for row in cursor:
+                        level=row['AdmLevel']
+                if body == "Привет" or body == "!пинг" :
+                    vk.method("messages.send", {"peer_id": id, "message": "Привет!", "keyboard": keyboard,
+                                                                "random_id": random.randint(1, 2147483647)})
+
+                elif body == "РАСПИСАНИЕ: На завтра" or body == "!расписаниезавтра":
+                    sql = "SELECT Groupp FROM Users WHERE ID_VK=" + str(id) + ';'
+                    cursor.execute(sql)
+                    for row in cursor:
+                        group=row['Groupp']
+                    try:
+                        Timetable =  showTimetable(group, 1)
+                        if Timetable:
+                            vk.method("messages.send",
+                                     {"peer_id": id, "message": "Расписание на завтра:\n" + Timetable, "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+                        else:
+                            vk.method("messages.send",
+                                     {"peer_id": id, "message": "Завтра можно отдохнуть :)", "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+                        
+                    except Exception as E:
+                        vk.method("messages.send",
+                                  {"peer_id": id, "message": "Завтра можно отдохнуть :]", "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+
+                        
+
+
+                elif body == "На сегодня" or body == "!расписаниесегодня" :
+                    sql = "SELECT Groupp FROM Users WHERE ID_VK=" + str(id) + ';'
+                    cursor.execute(sql)
+                    for row in cursor:
+                        group=row['Groupp']
+                    #Timetable =  showTimetable(group)
+                    try:
+                        Timetable =  showTimetable(group)
+                        if Timetable:
+                            vk.method("messages.send",
+                                     {"peer_id": id, "message": "Расписание на сегодня:\n" + Timetable, "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+                        else:
+                            vk.method("messages.send",
+                                     {"peer_id": id, "message": "Завтра можно отдохнуть :)", "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+                    except Exception as E:
+                        vk.method("messages.send",
+                                  {"peer_id": id, "message": "Сегодня можно отдохнуть :]", "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+
+                elif body == "Полностью" or body == "!расписание" :
+                    vk.method("messages.send",
+                              {"peer_id": id, "message": "Расписание:\n" + str(Rasp(body,id)), "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+
+                elif body == "Регистрация":
+                        vk.method("messages.send",
+                              {"peer_id": id, "message": "Регистрация. Нам необходимо знать о тебе 2 параметра - Имя Фамилия и  группа. Введи команду !рег группа Имя Фамилия\n Обращаю внимание на то, что впоследствии данные можно будет исправить.", "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+
+                
+                elif body[0:12] == "!обновитьимя":
+                    print("Изменение имени "+ str(body[12:]) + " от " + str(id))
+                    sql = "UPDATE Users SET Name='" + str(body[12:]) + "' WHERE ID_VK=" + str(id) + ';'
+                    cursor.execute(sql)
+                    connection.commit()
+                    vk.method("messages.send",
+                          {"peer_id": id, "message": "Имя Фамилия изменены на " + str(body[13:]), "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+                elif body[0:15] == "!обновитьгруппу":
+                    print("Изменение группы "+ str(showGroupId(body[16:])) + " от " + str(id))
+                    sql = "UPDATE Users SET Groupp='" + str(showGroupId(body[16:])) + "' WHERE ID_VK=" + str(id) + ';'
+                    print(sql)
+                    cursor.execute(sql)
+                    connection.commit()
+                    vk.method("messages.send",
+                          {"peer_id": id, "message": "Группа изменена на: " + str(body[16:]), "keyboard": keyboard, "random_id": random.randint(1, 2147483647)})
+                
+                elif level>1:
+
+                    sql = "SELECT Groupp FROM Users WHERE ID_VK=" + str(id) + ';'
+                    cursor.execute(sql)
+                    for row in cursor:
+                        group = row['Groupp']
+
+
+                    if body[0:10] == "!разослать":
+                        print(body)
+                        sql = "SELECT ID_VK FROM Users WHERE Groupp="+str(group) + ';'
+                        cursor.execute(sql)
+                        users = []
+                        for row in cursor:
+                            users.append(row['ID_VK'])
+                        try:    
+                            if  str(messages["items"][0]["last_message"]["attachments"][0]['type']) == 'wall':
+                                attachment = str(messages["items"][0]["last_message"]["attachments"][0]['type']) + str(messages["items"][0]["last_message"]["attachments"][0]['wall']['to_id']) + "_" + str(messages["items"][0]["last_message"]["attachments"][0]['wall']['id'])
+                            elif str(messages["items"][0]["last_message"]["attachments"][0]['type'])=='photo':
+                                attachment=''
+                                items = messages["items"][0]["last_message"]["attachments"]
+                                for item in items:
+                                    attachment += str(item['type']) + str(item['photo']['owner_id']) + "_" + str(item['photo']['id']) + '_' +str(item['photo']['access_key']) +','
+                        except Exception as E:
+                            pass
+                        for user in users:
+                            vk.method("messages.send",
+                                          {"peer_id": user, "message": body[11:] , "keyboard": keyboard, "random_id": random.randint(1, 2147483647), "attachment" : str(attachment[:-1])})
+
+                            
+                    if body[0:5] == "!всем":
+                        attachment = []
+                        print(body)
+                        sql = "SELECT ID_VK FROM Users;"
+                        cursor.execute(sql)
+                        users = []
+                        for row in cursor:
+                            users.append(row['ID_VK'])
+                        try:    
+                            if  str(messages["items"][0]["last_message"]["attachments"][0]['type']) == 'wall':
+                                attachment = str(messages["items"][0]["last_message"]["attachments"][0]['type']) + str(messages["items"][0]["last_message"]["attachments"][0]['wall']['to_id']) + "_" + str(messages["items"][0]["last_message"]["attachments"][0]['wall']['id'])
+                            elif str(messages["items"][0]["last_message"]["attachments"][0]['type'])=='photo':
+                                attachment=''
+                                res=''
+                                items = messages["items"][0]["last_message"]["attachments"]
+                                for item in items:
+                                    attachment += str(item['type']) + str(item['photo']['owner_id']) + "_" + str(item['photo']['id']) + '_' +str(item['photo']['access_key']) +','
+                        except Exception as E:
+                            pass
+                        for user in users:
+                            vk.method("messages.send",
+                                          {"peer_id": user, "message": body[6:] , "keyboard": keyboard, "random_id": random.randint(1, 2147483647), "attachment" : str(attachment[:-1])})
+
+                            
+                            
+                    
+
+                else:
+                    vk.method("messages.send", {"peer_id": id, "message": "Я не понял тебя!\n Если не поддерживается клавиатура, введи 'Команды'", "keyboard": keyboard,
+                                            "random_id": random.randint(1, 2147483647)})
+
+                
+
+
+            elif body[0:4] == "!рег":
+                Registration(id, body)
+
+            elif not InBase(id):
+                vk.method("messages.send", {"peer_id": id, "message": "Похоже, что ты не зарегистриован. Для работы бота необходима регистрация.\nНам необходимо знать о тебе 2 параметра - Имя Фамилия и  группа. Введи команду !рег группа Имя Фамилия \n (напр. !рег 4131 Иванов Ваня)\n Обращаю внимание на то, что впоследствии данные можно будет исправить.",
+                                    "random_id": random.randint(1, 2147483647)})
+            else: # body!='':
+                vk.method("messages.send", {"peer_id": id, "message": "Я не понял тебя!\n Если не поддерживается клавиатура, введи 'Команды'","keyboard": keyboard,
+                                            "random_id": random.randint(1, 2147483647)})
+
+
+        time.sleep(0.5)
+    except Exception as E:
+        time.sleep(1)
+
+connection.close()
